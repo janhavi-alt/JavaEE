@@ -1,0 +1,14 @@
+cd C:\Program Files\MySQL\MySQL Server 8.0\bin
+mysql -u root -p
+Enter password: root
+CREATE DATABASE room_reservation;
+USE room_reservation;
+CREATE TABLE rooms (
+    ->     room_id INT PRIMARY KEY,
+    ->     room_name VARCHAR(50),
+    ->     status VARCHAR(20) -- Available or Reserved
+    -> );
+
+INSERT INTO rooms VALUES (101, 'Conference Room A', 'Available');
+INSERT INTO rooms VALUES (102, 'Meeting Room B', 'Available');
+INSERT INTO rooms VALUES (103, 'Training Room C', 'Available');
