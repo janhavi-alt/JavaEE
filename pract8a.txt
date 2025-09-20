@@ -1,0 +1,184 @@
+Add mysql connector jar file 
+CREATE DATABASE inventorydb;
+
+
+### Create an entity class(persistence class)name it Item.java  
+package entity;
+
+import java.io.Serializable;
+import javax.persistence.*;
+
+@Entity
+@Table(name = "item")
+public class Item implements Serializable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    private String name;
+    private int quantity;
+    private double price;
+
+    public Item() {
+    }
+
+    public Item(String name, int quantity, double price) {
+        this.name = name;
+        this.quantity = quantity;
+        this.price = price;
+    }
+
+    // --- Getters and Setters ---
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+    public void setPrice(double price) {
+        this.price = price;
+    }
+}
+
+
+### index.jsp 
+<%@ page import="javax.persistence.*,java.util.*,entity.Item" %>
+<%
+    // Create or reuse EMF in application scope (better than recreating every request)
+    EntityManagerFactory emf = (EntityManagerFactory) application.getAttribute("emf");
+    if (emf == null) {
+        emf = Persistence.createEntityManagerFactory("pract8aPU");
+        application.setAttribute("emf", emf);
+    }
+
+    EntityManager em = emf.createEntityManager();
+    String error = null;
+
+    try {
+        // Read parameters
+        String name = request.getParameter("name");
+        String qty  = request.getParameter("quantity");
+        String price = request.getParameter("price");
+
+        // Only attempt to save if user actually submitted values
+        if (name != null && name.trim().length() > 0
+            && qty != null && qty.trim().length() > 0
+            && price != null && price.trim().length() > 0) {
+
+            // Normalize and validate numeric input
+            String qtyTrim = qty.trim();
+            String priceTrim = price.trim().replace(',', '.'); // allow comma decimal
+
+            int q;
+            double p;
+            try {
+                q = Integer.parseInt(qtyTrim);
+                p = Double.parseDouble(priceTrim);
+            } catch (NumberFormatException nfe) {
+                throw new IllegalArgumentException("Quantity or price is not a valid number.");
+            }
+
+            // Persist safely
+            try {
+                em.getTransaction().begin();
+                Item item = new Item(name.trim(), q, p); // ensure Item has this constructor
+                em.persist(item);
+                em.getTransaction().commit();
+            } catch (Exception e) {
+                if (em.getTransaction().isActive()) em.getTransaction().rollback();
+                throw e;
+            }
+        }
+    } catch (Exception ex) {
+        // Catch user/parse/db errors and display message
+        error = ex.getMessage();
+    } finally {
+        if (em.isOpen()) em.close();
+    }
+
+    // Fetch all items (fresh EM)
+    em = emf.createEntityManager();
+    List<Item> items = Collections.emptyList();
+    try {
+        items = em.createQuery("SELECT i FROM Item i", Item.class).getResultList();
+    } catch(Exception e) {
+        error = (error == null) ? ("Error fetching items: " + e.getMessage()) : error;
+    } finally {
+        if (em.isOpen()) em.close();
+    }
+%>
+
+<html>
+<head><title>Simple Inventory</title></head>
+<body>
+<h2>Inventory List</h2>
+
+<% if (error != null) { %>
+  <div style="color:red;"><b>Error:</b> <%= error %></div>
+<% } %>
+
+<table border="1">
+<tr><th>ID</th><th>Name</th><th>Quantity</th><th>Price</th></tr>
+<% for(Item i : items) { %>
+<tr>
+    <td><%= i.getId() %></td>
+    <td><%= i.getName() %></td>
+    <td><%= i.getQuantity() %></td>
+    <td><%= i.getPrice() %></td>
+</tr>
+<% } %>
+</table>
+
+<h3>Add New Item</h3>
+<form method="post">
+    Name: <input type="text" name="name" /><br/>
+    Quantity: <input type="number" name="quantity" /><br/>
+    Price: <input type="text" name="price" /><br/>
+    <input type="submit" value="Add Item" />
+</form>
+</body>
+</html>
+
+### persistence.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="2.1"
+             xmlns="http://xmlns.jcp.org/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence
+                                 http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
+
+  <persistence-unit name="pract8aPU" transaction-type="RESOURCE_LOCAL">
+    <class>entity.Item</class>
+    <exclude-unlisted-classes>false</exclude-unlisted-classes>
+
+    <properties>
+      <!-- MySQL JDBC settings -->
+      <property name="javax.persistence.jdbc.driver" value="com.mysql.cj.jdbc.Driver"/>
+      <property name="javax.persistence.jdbc.url" value="jdbc:mysql://localhost:3306/inventorydb?useSSL=false&amp;serverTimezone=UTC"/>
+      <property name="javax.persistence.jdbc.user" value="root"/>
+      <property name="javax.persistence.jdbc.password" value="Admin123"/>
+
+      <!-- Schema generation -->
+      <property name="javax.persistence.schema-generation.database.action" value="create"/>
+
+      <!-- EclipseLink logging -->
+      <property name="eclipselink.logging.level" value="FINE"/>
+    </properties>
+  </persistence-unit>
+</persistence>
