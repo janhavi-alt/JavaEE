@@ -1,0 +1,108 @@
+Pract7b. Develop simple visitor Statistics application using Message Driven Bean [Stateless
+Session Bean].
+C:\Users\F.G.NAIK>cd C:\Program Files\glassfish-4.1.1\bin
+
+C:\Program Files\glassfish-4.1.1\bin>asadmin create-jms-resource --restype javax.jms.Queue --property Name=VisitorQueue jms/VisitorQueue
+Administered object jms/VisitorQueue created.
+Command create-jms-resource executed successfully.
+
+### VisitorMessageBean.java
+package ejb;
+
+import javax.ejb.ActivationConfigProperty;
+import javax.ejb.EJB;
+import javax.ejb.MessageDriven;
+import javax.jms.Message;
+import javax.jms.MessageListener;
+
+@MessageDriven(
+    activationConfig = {
+        @ActivationConfigProperty(propertyName = "destinationLookup", propertyValue = "jms/VisitorQueue"),
+        @ActivationConfigProperty(propertyName = "destinationType", propertyValue = "javax.jms.Queue")
+    }
+)
+public class VisitorMessageBean implements MessageListener {
+
+    @EJB
+    private VisitorStatBean visitorStatBean;
+
+    @Override
+    public void onMessage(Message message) {
+        try {
+            System.out.println("Visitor Message Received!");
+            visitorStatBean.incrementVisitor();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+### VisitorStatBean.java
+package ejb;
+
+import javax.ejb.Stateless;
+
+@Stateless
+public class VisitorStatBean {
+    private static int visitorCount = 0;
+
+    public void incrementVisitor() {
+        visitorCount++;
+    }
+
+    public int getVisitorCount() {
+        return visitorCount;
+    }
+}
+
+### VisitorServlet.java
+package web;
+
+import ejb.VisitorStatBean;
+import javax.annotation.Resource;
+import javax.ejb.EJB;
+import javax.jms.ConnectionFactory;
+import javax.jms.JMSContext;
+import javax.jms.Queue;
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+
+public class VisitorServlet extends HttpServlet {
+
+    @Resource(lookup = "jms/VisitorQueue")
+    private Queue queue;
+
+    @Resource(lookup = "jms/__defaultConnectionFactory")
+    private ConnectionFactory connectionFactory;
+
+    @EJB
+    private VisitorStatBean visitorStatBean;
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        // Send message to Queue
+        try (JMSContext context = connectionFactory.createContext()) {
+            context.createProducer().send(queue, "New Visitor");
+        }
+
+        // Show updated count
+        int count = visitorStatBean.getVisitorCount();
+        response.setContentType("text/html");
+        PrintWriter out = response.getWriter();
+        out.println("<html><body>");
+        out.println("<h2>Visitor Statistics</h2>");
+        out.println("<p>Total Visitors: " + count + "</p>");
+        out.println("</body></html>");
+    }
+}
+
+
+
+
+
+
+
